@@ -8,20 +8,21 @@ import matheus.stefanello.trabalhobackend.model.ProgramaFidelidade;
 import matheus.stefanello.trabalhobackend.model.Usuario;
 import matheus.stefanello.trabalhobackend.repository.ProgramaFidelidadeRepository;
 import matheus.stefanello.trabalhobackend.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class FidelidadeService {
 
-    @Autowired
-    private ProgramaFidelidadeRepository programaFidelidadeRepository;
+    private final ProgramaFidelidadeRepository programaFidelidadeRepository;
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
+
+    private final AuditLogService auditLogService;
 
     @Transactional
     public FidelidadeResponseDTO aderirPrograma() {
@@ -44,6 +45,7 @@ public class FidelidadeService {
                 .consentimento(true)
                 .build();
         programa = programaFidelidadeRepository.save(programa);
+        auditLogService.registrar("LOYALTY_JOINED", "PROGRAMA_FIDELIDADE", programa.getId(), usuario.getEmail(), "Usuário aderiu ao programa de fidelidade");
 
         return toResponseDTO(programa);
     }
@@ -75,6 +77,7 @@ public class FidelidadeService {
         // Resgatar pontos (atualiza saldo diretamente)
         programa.setSaldo(programa.getSaldo() - dto.getPontos());
         programa = programaFidelidadeRepository.save(programa);
+        auditLogService.registrar("LOYALTY_REDEEMED", "PROGRAMA_FIDELIDADE", programa.getId(), usuario.getEmail(), "Resgate de " + dto.getPontos() + " pontos");
 
         return toResponseDTO(programa);
     }

@@ -11,23 +11,23 @@ import matheus.stefanello.trabalhobackend.model.Pagamento;
 import matheus.stefanello.trabalhobackend.model.Pedido;
 import matheus.stefanello.trabalhobackend.repository.PagamentoRepository;
 import matheus.stefanello.trabalhobackend.repository.PedidoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class PagamentoService {
 
-    @Autowired
-    private PagamentoRepository pagamentoRepository;
+    private final PagamentoRepository pagamentoRepository;
 
-    @Autowired
-    private PedidoRepository pedidoRepository;
+    private final PedidoRepository pedidoRepository;
 
-    @Autowired
-    private PagamentoMockService pagamentoMockService;
+    private final PagamentoMockService pagamentoMockService;
+
+    private final AuditLogService auditLogService;
 
     @Transactional
     public PagamentoResponseDTO solicitarPagamento(PagamentoRequestDTO dto) {
@@ -66,24 +66,30 @@ public class PagamentoService {
             // Processar resposta do mock
             StatusPagamento statusPagamento = StatusPagamento.valueOf((String) resultadoMock.get("status"));
             String mensagem = (String) resultadoMock.get("mensagem");
+            String payloadRetorno = pagamentoMockService.toJson(resultadoMock);
 
             // Atualizar pagamento (simplificado - sem transactionId e dadosRetorno)
             pagamento.setStatus(statusPagamento);
+            pagamento.setPayloadRetorno(payloadRetorno);
             pagamento = pagamentoRepository.save(pagamento);
 
             // Atualizar status do pedido se aprovado
             if (statusPagamento == StatusPagamento.APROVADO) {
                 pedido.setStatus(StatusPedido.PAGO);
                 pedidoRepository.save(pedido);
+                auditLogService.registrar("PAYMENT_APPROVED", "PAGAMENTO", pagamento.getId(), pedido.getUsuario() != null ? pedido.getUsuario().getEmail() : null, "Pagamento aprovado via mock");
+            } else {
+                auditLogService.registrar("PAYMENT_REJECTED", "PAGAMENTO", pagamento.getId(), pedido.getUsuario() != null ? pedido.getUsuario().getEmail() : null, "Pagamento recusado via mock");
             }
 
-            return toResponseDTO(pagamento, mensagem);
+            return toResponseDTO(pagamento, mensagem, payloadRetorno);
 
         } catch (Exception e) {
             // Em caso de erro, marcar pagamento como recusado se já foi criado
             if (pagamento != null && pagamento.getId() != null) {
                 pagamento.setStatus(StatusPagamento.RECUSADO);
                 pagamentoRepository.save(pagamento);
+                auditLogService.registrar("PAYMENT_FAILED", "PAGAMENTO", pagamento.getId(), pedido.getUsuario() != null ? pedido.getUsuario().getEmail() : null, "Erro ao processar pagamento: " + e.getMessage());
             }
             throw new PagamentoException("Erro ao processar pagamento: " + e.getMessage(), e);
         }
@@ -92,10 +98,10 @@ public class PagamentoService {
     public PagamentoResponseDTO buscarPorPedido(Long pedidoId) {
         Pagamento pagamento = pagamentoRepository.findByPedidoId(pedidoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pagamento não encontrado para o pedido", "pedidoId", pedidoId));
-        return toResponseDTO(pagamento, null);
+        return toResponseDTO(pagamento, null, pagamento.getPayloadRetorno());
     }
 
-    private PagamentoResponseDTO toResponseDTO(Pagamento pagamento, String mensagem) {
+    private PagamentoResponseDTO toResponseDTO(Pagamento pagamento, String mensagem, String payloadRetorno) {
         return PagamentoResponseDTO.builder()
                 .id(pagamento.getId())
                 .pedidoId(pagamento.getPedido().getId())
@@ -103,6 +109,7 @@ public class PagamentoService {
                 .metodoPagamento(pagamento.getMetodoPagamento())
                 .status(pagamento.getStatus())
                 .mensagem(mensagem)
+                .payloadRetorno(payloadRetorno)
                 .build();
     }
 }

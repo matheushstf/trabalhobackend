@@ -6,7 +6,8 @@ import matheus.stefanello.trabalhobackend.exception.ResourceNotFoundException;
 import matheus.stefanello.trabalhobackend.exception.UnauthorizedException;
 import matheus.stefanello.trabalhobackend.model.Usuario;
 import matheus.stefanello.trabalhobackend.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -17,13 +18,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class UsuarioService {
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    public List<UsuarioResponseDTO> listarTodos() {
-        return usuarioRepository.findAll().stream()
+    public List<UsuarioResponseDTO> listarTodos(int page, int limit) {
+        return usuarioRepository.findAll(PageRequest.of(page - 1, limit)).getContent().stream()
                 .map(this::toResponseDTO)
                 .collect(Collectors.toList());
     }

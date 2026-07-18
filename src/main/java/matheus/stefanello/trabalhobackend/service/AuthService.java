@@ -8,7 +8,7 @@ import matheus.stefanello.trabalhobackend.exception.BusinessRuleException;
 import matheus.stefanello.trabalhobackend.model.Usuario;
 import matheus.stefanello.trabalhobackend.repository.UsuarioRepository;
 import matheus.stefanello.trabalhobackend.security.JwtUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -21,22 +21,20 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Collections;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final JwtUtil jwtUtil;
 
-    @Autowired
-    private AuthenticationManager authenticationManager;
+    private final AuthenticationManager authenticationManager;
 
-    @Autowired
-    private UserDetailsService userDetailsService;
+    private final UserDetailsService userDetailsService;
+
+    private final AuditLogService auditLogService;
 
     @Transactional
     public AuthResponseDTO register(RegisterRequestDTO dto) {
@@ -60,6 +58,7 @@ public class AuthService {
                 .build();
 
         usuario = usuarioRepository.save(usuario);
+        auditLogService.registrar("USER_REGISTERED", "USUARIO", usuario.getId(), usuario.getEmail(), "Cadastro realizado com consentimento LGPD");
 
         // Gerar token
         UserDetails userDetails = userDetailsService.loadUserByUsername(usuario.getEmail());
@@ -77,6 +76,8 @@ public class AuthService {
         // Buscar usuário
         Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
                 .orElseThrow(() -> new BusinessRuleException("Usuário não encontrado"));
+
+        auditLogService.registrar("USER_LOGIN", "USUARIO", usuario.getId(), usuario.getEmail(), "Login realizado com sucesso");
 
         // Gerar token
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();

@@ -1,6 +1,8 @@
 package matheus.stefanello.trabalhobackend.repository;
 
 import matheus.stefanello.trabalhobackend.model.Unidade;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -10,4 +12,6 @@ import java.util.List;
 public interface UnidadeRepository extends JpaRepository<Unidade, Long> {
     
     List<Unidade> findByAtivaTrue();
+
+    Page<Unidade> findByAtivaTrue(Pageable pageable);
 }

@@ -21,4 +21,5 @@ public class PagamentoResponseDTO {
     private MetodoPagamento metodoPagamento;
     private StatusPagamento status;
     private String mensagem;
+    private String payloadRetorno;
 }

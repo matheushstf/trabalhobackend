@@ -37,4 +37,8 @@ public class Pagamento {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private StatusPagamento status = StatusPagamento.PENDENTE;
+
+    @Lob
+    @Column(name = "payload_retorno")
+    private String payloadRetorno;
 }

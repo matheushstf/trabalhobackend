@@ -9,7 +9,8 @@ import matheus.stefanello.trabalhobackend.exception.EstoqueInsuficienteException
 import matheus.stefanello.trabalhobackend.exception.ResourceNotFoundException;
 import matheus.stefanello.trabalhobackend.model.*;
 import matheus.stefanello.trabalhobackend.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -22,22 +23,20 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class PedidoService {
 
-    @Autowired
-    private PedidoRepository pedidoRepository;
+    private final PedidoRepository pedidoRepository;
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    @Autowired
-    private UnidadeRepository unidadeRepository;
+    private final UnidadeRepository unidadeRepository;
 
-    @Autowired
-    private ProdutoRepository produtoRepository;
+    private final ProdutoRepository produtoRepository;
 
-    @Autowired
-    private EstoqueProdutoRepository estoqueProdutoRepository;
+    private final EstoqueProdutoRepository estoqueProdutoRepository;
+
+    private final AuditLogService auditLogService;
 
     @Transactional
     public PedidoResponseDTO criarPedido(PedidoRequestDTO dto) {
@@ -98,13 +97,17 @@ public class PedidoService {
 
         pedido.setValorTotal(valorTotal);
         pedido = pedidoRepository.save(pedido);
+        auditLogService.registrar("ORDER_CREATED", "PEDIDO", pedido.getId(), usuario != null ? usuario.getEmail() : null, "Pedido criado no canal " + pedido.getCanalPedido());
 
         return toResponseDTO(pedido);
     }
 
-    public List<PedidoResponseDTO> listarPedidos(CanalPedido canalPedido, StatusPedido status, 
-                                                  Long unidadeId, LocalDateTime dataInicio, LocalDateTime dataFim) {
-        List<Pedido> pedidos = pedidoRepository.findByFiltros(canalPedido, status, unidadeId, dataInicio, dataFim);
+    public List<PedidoResponseDTO> listarPedidos(CanalPedido canalPedido, StatusPedido status,
+                                                  Long unidadeId, LocalDateTime dataInicio, LocalDateTime dataFim,
+                                                  int page, int limit) {
+        List<Pedido> pedidos = pedidoRepository.findByFiltros(
+                canalPedido, status, unidadeId, dataInicio, dataFim, PageRequest.of(page - 1, limit))
+                .getContent();
         return pedidos.stream().map(this::toResponseDTO).collect(Collectors.toList());
     }
 
@@ -123,6 +126,7 @@ public class PedidoService {
 
         pedido.setStatus(novoStatus);
         pedido = pedidoRepository.save(pedido);
+        auditLogService.registrar("ORDER_STATUS_CHANGED", "PEDIDO", pedido.getId(), "Status alterado para " + novoStatus);
 
         return toResponseDTO(pedido);
     }
@@ -147,6 +151,7 @@ public class PedidoService {
 
         pedido.setStatus(StatusPedido.CANCELADO);
         pedidoRepository.save(pedido);
+        auditLogService.registrar("ORDER_CANCELLED", "PEDIDO", pedido.getId(), "Pedido cancelado e estoque restaurado quando aplicável");
     }
 
     private void validarTransicaoStatus(StatusPedido statusAtual, StatusPedido novoStatus) {
